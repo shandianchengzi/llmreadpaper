@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学术论文辅助阅读工具 - 逐页处理</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --border-color: #ddd;
+            --bg-color: #f9f9f9;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+        }
+        
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+        }
+        
+        .upload-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .drop-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 30px;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .drop-area:hover, .drop-area.dragover {
+            border-color: var(--secondary-color);
+            background-color: rgba(52, 152, 219, 0.05);
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .model-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        select, input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: white;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 30px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--secondary-color);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+        
+        .button {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            margin: 0 5px;
+        }
+        
+        .button:hover {
+            background-color: #2980b9;
+        }
+        
+        .button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .button.export {
+            background-color: var(--success-color);
+        }
+        
+        .button.export:hover {
+            background-color: #219653;
+        }
+        
+        .button.stop {
+            background-color: var(--accent-color);
+        }
+        
+        .button.stop:hover {
+            background-color: #c0392b;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background: #f0f0f0;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background: var(--secondary-color);
+            border-radius: 5px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .progress-text {
+            text-align: center;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        
+        .display-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 70vh;
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-header {
+            font-weight: bold;
+            padding: 15px;
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--border-color);
+            background: #f8f9fa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .page-navigation {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .page-input {
+            width: 60px;
+            text-align: center;
+        }
+        
+        .panel-content {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+        }
+        
+        .original-text, .processed-text {
+            line-height: 1.8;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .processed-text {
+            color: #2c3e50;
+            border-left: 3px solid var(--secondary-color);
+            padding-left: 15px;
+        }
+        
+        .page-placeholder {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--secondary-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status.processing {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .page-status {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin: 10px 0;
+        }
+        
+        .page-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ddd;
+            cursor: pointer;
+        }
+        
+        .page-dot.processed {
+            background: var(--success-color);
+        }
+        
+        .page-dot.processing {
+            background: var(--warning-color);
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .export-options {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .export-info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>学术论文辅助阅读工具 - 逐页处理</h1>
+                <div>
+                    <span style="margin-right: 15px;">欢迎, <span id="userName">用户</span></span>
+                    <button class="button" id="logoutButton" style="background-color: #95a5a6;">退出登录</button>
+                </div>
+            </div>
+            <div id="apiStatus" class="status disconnected">API服务未连接</div>
+        </header>
+        
+        <div class="upload-section">
+            <h3>上传PDF文件</h3>
+            <div class="drop-area" id="dropArea">
+                <p>拖放PDF文件到这里，或<strong>点击选择文件</strong></p>
+                <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="model-selector">
+                <span>选择模型: </span>
+                <select id="modelSelect">
+                    <option value="qwq:latest-fixed">qwq:latest-fixed</option>
+                    <option value="deepseek-r1:14b-fixed">deepseek-r1:14b-fixed</option>
+                </select>
+                
+                <span style="margin-left: 20px;">启用术语翻译: </span>
+                <label class="switch">
+                    <input type="checkbox" id="termTranslation" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div>
+                <button class="button" id="startButton" disabled>开始处理</button>
+                <button class="button stop" id="stopButton" disabled>停止处理</button>
+                <button class="button export" id="exportButton">导出文本</button>
+            </div>
+        </div>
+        
+        <div class="progress-container" id="progressContainer" style="display: none;">
+            <div class="progress-bar" id="progressBar"></div>
+            <div class="progress-text" id="progressText">处理进度: 0/0 页 (0%)</div>
+        </div>
+        
+        <div class="page-status" id="pageStatus"></div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>处理中，请稍候...</p>
+        </div>
+        
+        <div class="display-container">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>原文（英文）</span>
+                    <div class="page-navigation">
+                        <button class="button" id="prevPage" disabled>上一页</button>
+                        <input type="number" id="currentPage" class="page-input" value="1" min="1" disabled>
+                        <span>/</span>
+                        <span id="totalPages">0</span>
+                        <button class="button" id="nextPage" disabled>下一页</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="original-text" id="originalText"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <span>处理后文本（中文）</span>
+                    <button class="button" id="copyPageButton" disabled>复制本页</button>
+                </div>
+                <div class="panel-content">
+                    <div class="processed-text" id="processedText"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="export-options" id="exportOptions" style="display: none;">
+            <h3>导出选项</h3>
+            <div class="export-info" id="exportInfo">
+                当前已处理 <span id="processedCount">0</span> / <span id="totalCount">0</span> 页
+            </div>
+            <div class="export-buttons">
+                <button class="button export" id="exportOriginalBtn">导出原文</button>
+                <button class="button export" id="exportProcessedBtn">导出译文</button>
+                <button class="button export" id="exportCombinedBtn">导出原文+译文</button>
+            </div>
+        </div>
+
+        <!-- 添加页脚 -->
+        <footer>
+            <p>Powered by <span class="shandianchengzi">shandianchengzi</span> | 学术论文辅助阅读工具 v1.0</p>
+            <p>© 2025 github: shandianchengzi. 保留所有权利.</p>
+        </footer>
+    </div>
+
+    <!-- 引入PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    
+    <script>
+        // 在JavaScript代码中嵌入shandianchengzi字符串
+        const SHANDIANCHENGZI_STRING = "shandianchengzi";
+
+        // 添加登出按钮事件监听
+        document.getElementById('logoutButton').addEventListener('click', function() {
+            fetch('/logout', {
+                method: 'GET',
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/login';
+                }
+            })
+            .catch(error => {
+                console.error('登出失败:', error);
+            });
+        });
+        
+        // 设置PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        
+        // 服务器配置 - 改为本地地址
+        const API_BASE_URL = '';
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropArea = document.getElementById('dropArea');
+            const fileInput = document.getElementById('fileInput');
+            const modelSelect = document.getElementById('modelSelect');
+            const termTranslation = document.getElementById('termTranslation');
+            const startButton = document.getElementById('startButton');
+            const stopButton = document.getElementById('stopButton');
+            const exportButton = document.getElementById('exportButton');
+            const exportOriginalBtn = document.getElementById('exportOriginalBtn');
+            const exportProcessedBtn = document.getElementById('exportProcessedBtn');
+            const exportCombinedBtn = document.getElementById('exportCombinedBtn');
+            const prevPage = document.getElementById('prevPage');
+            const nextPage = document.getElementById('nextPage');
+            const currentPage = document.getElementById('currentPage');
+            const totalPages = document.getElementById('totalPages');
+            const copyPageButton = document.getElementById('copyPageButton');
+            const originalText = document.getElementById('originalText');
+            const processedText = document.getElementById('processedText');
+            const loading = document.getElementById('loading');
+            const apiStatus = document.getElementById('apiStatus');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const pageStatus = document.getElementById('pageStatus');
+            const exportOptions = document.getElementById('exportOptions');
+            const exportInfo = document.getElementById('exportInfo');
+            const processedCount = document.getElementById('processedCount');
+            const totalCount = document.getElementById('totalCount');
+            
+            let pdfDoc = null;
+            let currentPageNum = 1;
+            let pageTexts = [];
+            let processedPages = [];
+            let isProcessing = false;
+            let processingQueue = [];
+            let currentProcessing = null;
+            let fileName = '';
+            
+            // 初始化导出按钮状态
+            exportButton.disabled = true;
+            exportOriginalBtn.disabled = true;
+            exportProcessedBtn.disabled = true;
+            exportCombinedBtn.disabled = true;
+            
+            // 检查API连接状态
+            checkAPIStatus();
+
+            // 添加获取模型列表的函数调用
+            fetchModelList();
+            
+            // 事件监听器
+            dropArea.addEventListener('click', () => fileInput.click());
+            dropArea.addEventListener('dragover', handleDragOver);
+            dropArea.addEventListener('dragleave', handleDragLeave);
+            dropArea.addEventListener('drop', handleDrop);
+            fileInput.addEventListener('change', handleFileSelect);
+            startButton.addEventListener('click', startProcessing);
+            stopButton.addEventListener('click', stopProcessing);
+            exportButton.addEventListener('click', () => exportOptions.style.display = exportOptions.style.display === 'none' ? 'block' : 'none');
+            exportOriginalBtn.addEventListener('click', exportOriginalText);
+            exportProcessedBtn.addEventListener('click', exportProcessedText);
+            exportCombinedBtn.addEventListener('click', exportCombinedText);
+            prevPage.addEventListener('click', () => changePage(currentPageNum - 1));
+            nextPage.addEventListener('click', () => changePage(currentPageNum + 1));
+            currentPage.addEventListener('change', handlePageInputChange);
+            copyPageButton.addEventListener('click', copyCurrentPage);
+            
+            // 拖放事件处理
+            function handleDragOver(e) {
+                e.preventDefault();
+                dropArea.classList.add('dragover');
+            }
+            
+            function handleDragLeave() {
+                dropArea.classList.remove('dragover');
+            }
+            
+            function handleDrop(e) {
+                e.preventDefault();
+                dropArea.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    handlePDFFile(e.dataTransfer.files[0]);
+                }
+            }
+            
+            function handleFileSelect() {
+                if (fileInput.files.length) {
+                    handlePDFFile(fileInput.files[0]);
+                }
+            }
+            
+            // 检查API状态
+            async function checkAPIStatus() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/tags`, {
+                        method: 'GET'
+                    });
+                    
+                    if (response.ok) {
+                        apiStatus.textContent = 'API服务已连接';
+                        apiStatus.className = 'status connected';
+                    } else {
+                        throw new Error('API服务不可用');
+                    }
+                } catch (error) {
+                    apiStatus.textContent = 'API服务未连接';
+                    apiStatus.className = 'status disconnected';
+                }
+            }
+            
+            // 处理PDF文件
+            async function handlePDFFile(file) {
+                if (file.type !== 'application/pdf') {
+                    alert('请上传PDF文件');
+                    return;
+                }
+                
+                loading.style.display = 'block';
+                resetUI();
+                
+                try {
+                    fileName = file.name.replace('.pdf', '');
+                    const arrayBuffer = await file.arrayBuffer();
+                    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    
+                    totalPages.textContent = pdfDoc.numPages;
+                    totalCount.textContent = pdfDoc.numPages;
+                    currentPage.max = pdfDoc.numPages;
+                    
+                    // 初始化页面状态
+                    pageTexts = new Array(pdfDoc.numPages).fill('');
+                    processedPages = new Array(pdfDoc.numPages).fill('');
+                    
+                    // 创建页面状态指示器
+                    createPageStatusDots(pdfDoc.numPages);
+                    
+                    // 加载第一页
+                    await loadPage(1);
+                    
+                    startButton.disabled = false;
+                    exportButton.disabled = false;
+                    exportOriginalBtn.disabled = false;
+                    exportProcessedBtn.disabled = false;
+                    exportCombinedBtn.disabled = false;
+                    exportOptions.style.display = 'block';
+                    updateExportInfo();
+                    
+                } catch (error) {
+                    console.error('处理PDF时出错:', error);
+                    alert('处理PDF时出错: ' + error.message);
+                } finally {
+                    loading.style.display = 'none';
+                }
+            }
+            
+            // 创建页面状态指示器
+            function createPageStatusDots(totalPages) {
+                pageStatus.innerHTML = '';
+                for (let i = 0; i < totalPages; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'page-dot';
+                    dot.title = `第 ${i + 1} 页`;
+                    dot.addEventListener('click', () => changePage(i + 1));
+                    pageStatus.appendChild(dot);
+                }
+            }
+            
+            // 更新页面状态
+            function updatePageStatus(pageNum, status) {
+                const dots = pageStatus.querySelectorAll('.page-dot');
+                if (dots[pageNum - 1]) {
+                    dots[pageNum - 1].className = 'page-dot';
+                    if (status === 'processed') {
+                        dots[pageNum - 1].classList.add('processed');
+                    } else if (status === 'processing') {
+                        dots[pageNum - 1].classList.add('processing');
+                    }
+                }
+            }
+            
+            // 更新导出信息
+            function updateExportInfo() {
+                const processed = processedPages.filter(text => text).length;
+                processedCount.textContent = processed;
+                totalCount.textContent = pdfDoc.numPages;
+            }
+            
+            // 加载页面
+            async function loadPage(pageNum) {
+                if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
+                
+                loading.style.display = 'block';
+                
+                try {
+                    const page = await pdfDoc.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    
+                    pageTexts[pageNum - 1] = pageText;
+                    originalText.textContent = pageText;
+                    
+                    currentPageNum = pageNum;
+                    currentPage.value = pageNum;
+                    
+                    // 显示已处理的内容或占位符
+                    if (processedPages[pageNum - 1]) {
+                        processedText.textContent = processedPages[pageNum - 1];
+                        processedText.className = 'processed-text';
+                    } else {
+                        processedText.textContent = '此页面尚未处理\n\n点击"开始处理"按钮开始处理本页';
+                        processedText.className = 'page-placeholder';
+                    }
+                    
+                    // 更新导航按钮状态
+                    prevPage.disabled = pageNum <= 1;
+                    nextPage.disabled = pageNum >= pdfDoc.numPages;
+                    copyPageButton.disabled = !processedPages[pageNum - 1];
+                    
+                } catch (error) {
+                    console.error('加载页面时出错:', error);
+                } finally {
+                    loading.style.display = 'none';
+                }
+            }
+            
+            // 改变页面
+            function changePage(pageNum) {
+                if (pageNum >= 1 && pageNum <= pdfDoc.numPages) {
+                    loadPage(pageNum);
+                }
+            }
+            
+            // 处理页码输入
+            function handlePageInputChange() {
+                const pageNum = parseInt(currentPage.value);
+                if (!isNaN(pageNum)) {
+                    changePage(Math.max(1, Math.min(pageNum, pdfDoc.numPages)));
+                }
+            }
+            
+            // 开始处理
+            async function startProcessing() {
+                if (!pdfDoc || isProcessing) return;
+                
+                isProcessing = true;
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                progressContainer.style.display = 'block';
+                
+                // 创建处理队列（只处理未处理的页面）
+                processingQueue = [];
+                for (let i = 0; i < pdfDoc.numPages; i++) {
+                    if (!processedPages[i]) {
+                        processingQueue.push(i + 1);
+                    }
+                }
+                
+                // 开始处理队列
+                processQueue();
+            }
+            
+            // 停止处理
+            function stopProcessing() {
+                isProcessing = false;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                
+                if (currentProcessing) {
+                    currentProcessing.controller.abort();
+                    currentProcessing = null;
+                }
+            }
+            
+            // 处理队列
+            async function processQueue() {
+                if (!isProcessing || processingQueue.length === 0) {
+                    stopProcessing();
+                    return;
+                }
+                
+                const pageNum = processingQueue.shift();
+                updatePageStatus(pageNum, 'processing');
+                
+                try {
+                    const pageText = pageTexts[pageNum - 1];
+                    if (!pageText) {
+                        // 如果页面文本尚未提取，先提取
+                        const page = await pdfDoc.getPage(pageNum);
+                        const textContent = await page.getTextContent();
+                        pageTexts[pageNum - 1] = textContent.items.map(item => item.str).join(' ');
+                    }
+                    
+                    // 处理页面文本
+                    const result = await processPage(pageNum, pageTexts[pageNum - 1]);
+                    processedPages[pageNum - 1] = result;
+                    
+                    // 更新UI
+                    updatePageStatus(pageNum, 'processed');
+                    updateProgress();
+                    updateExportInfo();
+                    
+                    // 如果当前显示的是正在处理的页面，更新显示
+                    if (currentPageNum === pageNum) {
+                        processedText.textContent = result;
+                        processedText.className = 'processed-text';
+                        copyPageButton.disabled = false;
+                    }
+                    
+                    // 继续处理下一页
+                    processQueue();
+                    
+                } catch (error) {
+                    console.error(`处理第 ${pageNum} 页时出错:`, error);
+                    updatePageStatus(pageNum, '');
+                    processQueue(); // 继续处理下一页
+                }
+            }
+            
+            // 添加获取模型列表的函数
+            async function fetchModelList() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/tags`);
+                    if (!response.ok) {
+                        throw new Error('无法获取模型列表');
+                    }
+                    
+                    const data = await response.json();
+                    const modelSelect = document.getElementById('modelSelect');
+                    
+                    // 清空现有选项
+                    modelSelect.innerHTML = '';
+                    
+                    // 添加从API获取的模型
+                    if (data.models && data.models.length > 0) {
+                        let hasFixed = false;
+                        data.models.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.name;
+                            option.textContent = model.name;
+                            modelSelect.appendChild(option);
+                            if (model.name === 'qwq:latest-fixed') {
+                                hasFixed = true;
+                            }
+                        });
+                        if (hasFixed) {
+                            modelSelect.value = 'qwq:latest-fixed';
+                        }
+                    } else {
+                        // 如果没有获取到模型，添加默认选项
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = '无可用模型';
+                        modelSelect.appendChild(option);
+                    }
+                } catch (error) {
+                    console.error('获取模型列表失败:', error);
+                    const modelSelect = document.getElementById('modelSelect');
+                    modelSelect.innerHTML = '';
+                    
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = '获取模型失败';
+                    modelSelect.appendChild(option);
+                }
+            }
+            
+            // 处理单页文本
+            async function processPage(pageNum, text) {
+                const controller = new AbortController();
+                currentProcessing = { controller, pageNum };
+                
+                try {
+                    const prompt = constructPrompt(text, termTranslation.checked);
+                    
+                    // 在请求中添加shandianchengzi标识
+                    const response = await fetch(`${API_BASE_URL}/api/generate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Application-Identifier': SHANDIANCHENGZI_STRING // 添加标识
+                        },
+                        body: JSON.stringify({
+                            model: modelSelect.value,
+                            prompt: prompt,
+                            stream: false,
+                            options: {
+                                temperature: 0.1,
+                                top_p: 0.9,
+                                top_k: 40
+                            },
+                            // 在请求体中添加标识
+                            metadata: {
+                                source: SHANDIANCHENGZI_STRING,
+                                version: "1.0"
+                            }
+                        }),
+                        signal: controller.signal
+                    });
+
+                    console.log(response);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Ollama API错误: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    return data.response;
+                    
+                } finally {
+                    if (currentProcessing && currentProcessing.pageNum === pageNum) {
+                        currentProcessing = null;
+                    }
+                }
+            }
+            
+            // 更新进度
+            function updateProgress() {
+                const processedCount = processedPages.filter(text => text).length;
+                const totalCount = pdfDoc.numPages;
+                const percentage = Math.round((processedCount / totalCount) * 100);
+                
+                progressBar.style.width = `${percentage}%`;
+                progressText.textContent = `处理进度: ${processedCount}/${totalCount} 页 (${percentage}%)`;
+            }
+            
+            // 复制当前页
+            function copyCurrentPage() {
+                if (processedPages[currentPageNum - 1]) {
+                    navigator.clipboard.writeText(processedPages[currentPageNum - 1])
+                        .then(() => alert('本页译文已复制到剪贴板'))
+                        .catch(err => console.error('复制失败:', err));
+                }
+            }
+            
+            // 导出原文
+            function exportOriginalText() {
+                if (!pdfDoc) {
+                    alert('请先上传PDF文件');
+                    return;
+                }
+                
+                const content = generateOriginalTextContent();
+                downloadTextFile(content, `${fileName}_原文.txt`);
+                alert('原文导出成功！');
+            }
+            
+            // 导出译文
+            function exportProcessedText() {
+                if (!pdfDoc) {
+                    alert('请先上传PDF文件');
+                    return;
+                }
+                
+                const content = generateProcessedTextContent();
+                downloadTextFile(content, `${fileName}_译文.txt`);
+                alert('译文导出成功！');
+            }
+            
+            // 导出原文+译文
+            function exportCombinedText() {
+                if (!pdfDoc) {
+                    alert('请先上传PDF文件');
+                    return;
+                }
+                
+                const content = generateCombinedTextContent();
+                downloadTextFile(content, `${fileName}_原文+译文.txt`);
+                alert('原文+译文导出成功！');
+            }
+            
+            // 生成原文内容
+            function generateOriginalTextContent() {
+                let content = '';
+                for (let i = 0; i < pdfDoc.numPages; i++) {
+                    content += `=== 第 ${i + 1} 页 ===\n\n`;
+                    content += pageTexts[i] + '\n\n';
+                    content += '='.repeat(40) + '\n\n';
+                }
+                return content;
+            }
+            
+            // 生成译文内容
+            function generateProcessedTextContent() {
+                let content = '';
+                const processedCount = processedPages.filter(text => text).length;
+                
+                content += `处理进度: ${processedCount}/${pdfDoc.numPages} 页\n`;
+                content += '='.repeat(40) + '\n\n';
+                
+                for (let i = 0; i < pdfDoc.numPages; i++) {
+                    content += `=== 第 ${i + 1} 页 ===\n\n`;
+                    if (processedPages[i]) {
+                        content += processedPages[i] + '\n\n';
+                    } else {
+                        content += '⚠️ 此页面尚未处理\n\n';
+                    }
+                    content += '='.repeat(40) + '\n\n';
+                }
+                return content;
+            }
+            
+            // 生成合并内容（原文+译文）
+            function generateCombinedTextContent() {
+                let content = '';
+                const processedCount = processedPages.filter(text => text).length;
+                
+                content += `处理进度: ${processedCount}/${pdfDoc.numPages} 页\n`;
+                content += '='.repeat(40) + '\n\n';
+                
+                for (let i = 0; i < pdfDoc.numPages; i++) {
+                    content += `=== 第 ${i + 1} 页 ===\n\n`;
+                    
+                    content += '【原文】\n';
+                    content += pageTexts[i] + '\n\n';
+                    
+                    content += '【译文】\n';
+                    if (processedPages[i]) {
+                        content += processedPages[i] + '\n\n';
+                    } else {
+                        content += '⚠️ 此页面尚未处理\n\n';
+                    }
+                    
+                    content += '='.repeat(40) + '\n\n';
+                }
+                return content;
+            }
+            
+            // 下载文本文件
+            function downloadTextFile(content, filename) {
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            
+            // 构造提示词
+            function constructPrompt(text, enableTranslation) {
+                return `你是一名专业的学术文献转换助手。请将以下英文论文内容逐页转换为中文，严格遵循以下规则：
+
+# 核心规则
+1. 信息保留：
+- 100%保留原文技术细节
+- 所有数字用【】标注（如【92.3%】）
+- 数学符号/公式原样保留
+
+2. 术语处理：
+- 专业术语保留英文原名（如ResNet）
+- 硬件寄存器保留原始格式（如CR.TXEN）
+${enableTranslation ? '- 常见非专业术语可翻译为中文' : '- 所有术语保留英文'}
+
+3. 中文优化：
+- 被动语态转主动（"is proposed"→"本研究提出"）
+- 长句拆分（>35字且含3+技术名词时）
+- 删除冗余表达（"的情况下"→"时"）
+
+4. 结构要求：
+- 严格保持原文段落结构
+- 使用自然衔接词
+
+# 禁止事项
+❌ 添加术语翻译对照表
+❌ 使用分点编号
+❌ 改变原文段落顺序
+❌ 引入主观评价
+❌ 添加思考过程
+❌ 添加额外解释
+
+请直接输出转换后的中文内容，不要有任何前缀或思考过程。
+
+待处理内容：
+${text}`.trim();
+            }
+            
+            // 重置UI
+            function resetUI() {
+                originalText.textContent = '';
+                processedText.textContent = '';
+                startButton.disabled = true;
+                stopButton.disabled = true;
+                exportButton.disabled = true;
+                exportOriginalBtn.disabled = true;
+                exportProcessedBtn.disabled = true;
+                exportCombinedBtn.disabled = true;
+                prevPage.disabled = true;
+                nextPage.disabled = true;
+                currentPage.disabled = true;
+                copyPageButton.disabled = true;
+                progressContainer.style.display = 'none';
+                pageStatus.innerHTML = '';
+                fileName = '';
+            }
+        });
+    </script>
+</body>
+</html>

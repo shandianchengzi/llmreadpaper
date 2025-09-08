@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  llm-readpaper:
+    build: .
+    ports:
+      - "${LLMPAPER_PORT:-8080}:${APP_PORT:-8080}"
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - LLM_USER=${LLM_USER}
+      - LLM_PASSWORD=${LLM_PASSWORD}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http:/172.17.0.1:11434}
+    restart: unless-stopped
