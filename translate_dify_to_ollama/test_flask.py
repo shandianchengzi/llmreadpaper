@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 import requests
 import json
 import time
@@ -102,6 +102,95 @@ def ollama_proxy():
         ollama_response["model"] = model  # 返回用户指定的模型名
         return jsonify(ollama_response)
 
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"API调用失败: {str(e)}"}), 502
+    except Exception as e:
+        return jsonify({"error": f"服务器错误: {str(e)}"}), 500
+
+@app.route('/api/chat', methods=['POST'])
+def ollama_chat():
+    """模拟Ollama的流式chat接口"""
+    try:
+        # 1. 获取请求参数
+        user_input = request.get_json()
+        messages = user_input.get("messages", [])
+        model = user_input.get("model", DEFAULT_MODEL)
+        
+        # 2. 验证模型是否可用
+        if model not in AVAILABLE_MODELS:
+            return jsonify({"error": f"Model '{model}' not available"}), 400
+        
+        # 3. 提取最后一条用户消息作为查询
+        if not messages or not isinstance(messages, list):
+            return jsonify({"error": "Invalid messages format"}), 400
+        
+        last_user_message = None
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                last_user_message = msg.get("content", "")
+                break
+        
+        if not last_user_message:
+            return jsonify({"error": "No user message found"}), 400
+        
+        # 4. 构造Dify请求
+        dify_payload = {
+            "query": last_user_message,
+            "model": model,
+            "response_mode": "streaming"
+        }
+        
+        # 5. 调用目标接口并返回流式响应
+        response = requests.post(
+            TARGET_URL,
+            json=dify_payload,
+            stream=True,
+            timeout=30
+        )
+        response.raise_for_status()
+        
+        # 6. 创建生成器函数处理流式响应
+        def generate():
+            full_response = ""
+            for chunk in response.iter_content(chunk_size=None):
+                if chunk:
+                    chunk_str = chunk.decode('utf-8')
+                    if chunk_str.startswith('data: '):
+                        try:
+                            data = json.loads(chunk_str[6:])
+                            if data.get('event') == 'message' and 'answer' in data:
+                                content = data['answer']
+                                full_response += content
+                                
+                                # 构造Ollama格式的流式响应
+                                ollama_chunk = {
+                                    "model": model,
+                                    "created_at": datetime.utcnow().isoformat() + "Z",
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": content
+                                    },
+                                    "done": False
+                                }
+                                yield json.dumps(ollama_chunk) + "\n"
+                        except json.JSONDecodeError:
+                            continue
+            
+            # 发送最终完成消息
+            ollama_final = {
+                "model": model,
+                "created_at": datetime.utcnow().isoformat() + "Z",
+                "message": {
+                    "role": "assistant",
+                    "content": ""
+                },
+                "done": True
+            }
+            yield json.dumps(ollama_final) + "\n"
+        
+        # 7. 返回流式响应
+        return Response(generate(), mimetype='application/json')
+        
     except requests.exceptions.RequestException as e:
         return jsonify({"error": f"API调用失败: {str(e)}"}), 502
     except Exception as e:
