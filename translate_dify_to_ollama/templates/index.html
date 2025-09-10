@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama 格式接口测试</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .response-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            background-color: #fafafa;
+        }
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 10px 16px;
+            transition: 0.3s;
+            color: black;
+        }
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        .tab button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tabcontent {
+            display: none;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+        }
+        pre {
+            margin: 0;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.3);
+            border-radius: 50%;
+            border-top-color: #4CAF50;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .model-selector {
+            margin-bottom: 15px;
+        }
+        select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ollama 兼容接口测试</h1>
+        
+        <div class="model-selector">
+            <label for="modelSelect">选择模型:</label>
+            <select id="modelSelect">
+                <!-- 动态加载模型 -->
+            </select>
+            <button onclick="loadModels()">刷新模型列表</button>
+        </div>
+        
+        <div class="form-group">
+            <label for="prompt">Prompt:</label>
+            <textarea id="prompt" placeholder="输入你的问题..."></textarea>
+        </div>
+        
+        <button id="submitBtn" onclick="submitRequest()">发送请求</button>
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div class="response-container">
+            <div class="tab">
+                <button class="tablinks active" onclick="openTab(event, 'response')">响应结果</button>
+                <button class="tablinks" onclick="openTab(event, 'rawRequest')">原始请求</button>
+                <button class="tablinks" onclick="openTab(event, 'rawResponse')">原始响应</button>
+            </div>
+            
+            <div id="response" class="tabcontent" style="display: block;">
+                <pre><code id="responseData">响应结果将显示在这里...</code></pre>
+            </div>
+            
+            <div id="rawRequest" class="tabcontent">
+                <pre><code id="requestData"></code></pre>
+            </div>
+            
+            <div id="rawResponse" class="tabcontent">
+                <pre><code id="rawResponseData"></code></pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <script>
+        // 初始化语法高亮
+        hljs.highlightAll();
+        
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+        
+        // 新增：加载可用模型
+        function loadModels() {
+            fetch('/api/tags')
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('modelSelect');
+                    select.innerHTML = '';
+                    data.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.name;
+                        option.textContent = model.name;
+                        select.appendChild(option);
+                    });
+                });
+        }
+
+        // 修改后的提交函数
+        function submitRequest() {
+            const prompt = document.getElementById('prompt').value;
+            const model = document.getElementById('modelSelect').value;
+            
+            const btn = document.getElementById('submitBtn');
+            const statusDiv = document.getElementById('status');
+            
+            if (!prompt) {
+                alert('请输入prompt内容');
+                return;
+            }
+            
+            // 准备请求数据
+            const requestData = {
+                prompt: prompt,
+                model: model  // 传递选择的模型
+            };
+            
+            // 显示原始请求
+            document.getElementById('requestData').textContent = JSON.stringify(requestData, null, 2);
+            hljs.highlightElement(document.getElementById('requestData'));
+            
+            // 清空之前的结果
+            document.getElementById('responseData').textContent = '请求中...';
+            document.getElementById('rawResponseData').textContent = '';
+            
+            // 禁用按钮并显示加载状态
+            btn.disabled = true;
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'status';
+            statusDiv.innerHTML = '<div class="loading"></div> 请求处理中...';
+            
+            // 发送请求
+            fetch('/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 显示格式化响应
+                document.getElementById('responseData').textContent = JSON.stringify(data, null, 2);
+                hljs.highlightElement(document.getElementById('responseData'));
+                
+                // 显示原始响应
+                document.getElementById('rawResponseData').textContent = JSON.stringify(data, null, 2);
+                hljs.highlightElement(document.getElementById('rawResponseData'));
+                
+                // 更新状态
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = '✓ 请求成功完成';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('responseData').textContent = '错误: ' + error.message;
+                
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = '✗ 请求失败: ' + error.message;
+            })
+            .finally(() => {
+                btn.disabled = false;
+            });
+        }
+
+        // 页面加载时自动获取模型
+        document.addEventListener('DOMContentLoaded', loadModels);
+    </script>
+</body>
+</html>

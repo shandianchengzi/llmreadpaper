@@ -20,6 +20,8 @@ Linux 系统，安装了 Ollama，并且 Ollama 的模型已经下载好，服�
 
 可以选择本地或者 Docker 部署。
 
+(如果你没有api，只有dify的api，可以尝试先运行一下文件夹translate_dify_to_ollama/test_flask.py，做一个dify到ollama的逆向转发。这是一个很小众的需求，这里就不展开介绍了)
+
 ### 1 本地部署
 
 ```bash

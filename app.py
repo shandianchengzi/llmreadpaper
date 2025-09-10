@@ -66,17 +66,20 @@ def ollama_proxy(subpath):
         else:
             return jsonify({'error': 'Method not allowed'}), 405
         
-        # 正确处理响应
-        response_headers = dict(response.headers)
-        # 移除可能引起问题的头
-        response_headers.pop('Content-Encoding', None)
-        response_headers.pop('Transfer-Encoding', None)
+        # 过滤掉不允许的响应头
+        excluded_headers = ['connection', 'keep-alive', 'proxy-authenticate',
+                          'proxy-authorization', 'te', 'trailers', 
+                          'transfer-encoding', 'upgrade']
+        headers = [
+            (k, v) for k, v in response.headers.items()
+            if k.lower() not in excluded_headers
+        ]
         
         # 确保正确的Content-Type
-        if 'Content-Type' not in response_headers and response.content:
-            response_headers['Content-Type'] = 'application/json'
+        if not any(k.lower() == 'content-type' for k, v in headers) and response.content:
+            headers.append(('Content-Type', 'application/json'))
         
-        return response.content, response.status_code, response_headers.items()
+        return response.content, response.status_code, headers
     
     except requests.exceptions.Timeout:
         return jsonify({'error': 'Request timeout'}), 504
