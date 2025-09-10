@@ -124,6 +124,12 @@ def logout():
 def main_app():
     return send_from_directory('.', 'llmreadpaper.html')
 
+@app.route('/chat')
+@login_required
+def chat():
+    """渲染交互测试页面"""
+    return render_template('index.html')
+
 if __name__ == '__main__':
     app_port = int(os.environ.get('APP_PORT', 8080))
     # 检查是否是开发环境

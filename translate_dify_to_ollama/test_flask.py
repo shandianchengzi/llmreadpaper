@@ -17,9 +17,18 @@ DEFAULT_MODEL = "dify1"
 AVAILABLE_MODELS = {
     "dify1": {
         "name": "dify1",
-        "modified_at": datetime.now().isoformat() + "Z",
+        "model": "dify1",
+        "modified_at": "2025-09-10T00:00:00Z",
         "size": 0,
-        "digest": "sha256:simulated"
+        "digest": "sha256:simulated",
+        "details": {
+            "parent_model": "",
+            "format": "",
+            "family": "",
+            "families": [],
+            "parameter_size": "",
+            "quantization_level": ""
+        }
     }
 }
 
@@ -100,4 +109,6 @@ def ollama_proxy():
 
 if __name__ == '__main__':
     port = os.environ.get('DIFY_PORT', '1235')
-    app.run(host='127.0.0.1', port=port)
+    # 在生产环境中，你应该使用WSGI服务器而不是直接运行app
+    from waitress import serve
+    serve(app, host='127.0.0.1', port=port)
