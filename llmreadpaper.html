@@ -361,9 +361,14 @@
             <h3>上传PDF或TXT文件</h3>
             <div class="drop-area" id="dropArea">
                 <p>拖放PDF或TXT文件到这里，或<strong>点击选择文件</strong></p>
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">TXT：仅支持从本网页导出的原文+译文TXT</p>
                 <input type="file" id="fileInput" accept=".pdf,.txt" style="display: none;">
             </div>
         </div>
+
+        <p style="font-size: 12px; color: #666; margin-top: 5px; font-style: italic;">
+            译文是大模型阅读原文后重新梳理的结果，并非直译，仅供参考后快速掌握论文思路，细节问题请务必对照英文查看。
+        </p>
         
         <div class="controls">
             <div class="model-selector">
@@ -378,9 +383,20 @@
                     <input type="checkbox" id="termTranslation" checked>
                     <span class="slider"></span>
                 </label>
+
+                <span style="margin-left: 20px;">启用重新处理: </span>
+                <label class="switch">
+                    <input type="checkbox" id="reprocessButton" checked>
+                    <span class="slider"></span>
+                </label>
             </div>
             
             <div>
+                <!-- 添加页码范围输入框 -->
+                <span style="margin-left: 20px;">起始页: </span>
+                <input type="number" id="startPageInput" class="page-input" value="1" min="1" style="width: 60px;">
+                <span>终止页: </span>
+                <input type="number" id="endPageInput" class="page-input" value="0" min="1" style="width: 60px;">
                 <button class="button" id="startButton" disabled>开始处理</button>
                 <button class="button stop" id="stopButton" disabled>停止处理</button>
                 <button class="button export" id="exportButton">导出文本</button>
@@ -389,7 +405,7 @@
         
         <div class="progress-container" id="progressContainer" style="display: none;">
             <div class="progress-bar" id="progressBar"></div>
-            <div class="progress-text" id="progressText">处理进度: 0/0 页 (0%)</div>
+            <div class="progress-text" id="progressText">处理进度: 0%</div>
         </div>
         
         <div class="page-status" id="pageStatus"></div>
@@ -478,6 +494,7 @@
             const fileInput = document.getElementById('fileInput');
             const modelSelect = document.getElementById('modelSelect');
             const termTranslation = document.getElementById('termTranslation');
+            const reprocessButton = document.getElementById('reprocessButton');
             const startButton = document.getElementById('startButton');
             const stopButton = document.getElementById('stopButton');
             const exportButton = document.getElementById('exportButton');
@@ -510,6 +527,10 @@
             let processingQueue = [];
             let currentProcessing = null;
             let fileName = '';
+
+            // 新增变量用于队列处理计数
+            let queueProcessedCount = 0; 
+            let queueTotalCount = 0;
             
             // 初始化导出按钮状态
             exportButton.disabled = true;
@@ -617,6 +638,13 @@
                     
                     // 创建页面状态指示器
                     createPageStatusDots(pdfDoc.numPages);
+
+                    // 更新页面状态
+                    for (let i = 0; i < pdfDoc.numPages; i++) {
+                        if (processedPages[i]) {
+                            updatePageStatus(i + 1, 'processed');
+                        }
+                    }
                     
                     // 加载第一页
                     await loadPage(1);
@@ -628,6 +656,14 @@
                     exportCombinedBtn.disabled = false;
                     exportOptions.style.display = 'block';
                     updateExportInfo();
+
+                    // 在handlePDFFile函数中添加设置终止页码默认值的代码
+                    totalPages.textContent = pdfDoc.numPages;
+                    totalCount.textContent = pdfDoc.numPages;
+                    currentPage.max = pdfDoc.numPages;
+                    // 设置终止页码输入框的默认值
+                    document.getElementById('endPageInput').value = pdfDoc.numPages;
+                    document.getElementById('endPageInput').max = pdfDoc.numPages;
                     
                 } catch (error) {
                     console.error('处理文件时出错:', error);
@@ -773,13 +809,30 @@
                 stopButton.disabled = false;
                 progressContainer.style.display = 'block';
                 
-                // 创建处理队列（只处理未处理的页面）
+                // 获取用户输入的起始和终止页码
+                const startPage = parseInt(document.getElementById('startPageInput').value) || 1;
+                let endPage = parseInt(document.getElementById('endPageInput').value) || pdfDoc.numPages;
+                // 确保终止页码不超过总页数
+                endPage = Math.min(endPage, pdfDoc.numPages);
+                
+                // 创建处理队列（只处理指定范围内未处理的页面）
                 processingQueue = [];
-                for (let i = 0; i < pdfDoc.numPages; i++) {
-                    if (!processedPages[i]) {
+                for (let i = startPage - 1; i < endPage; i++) {
+                    if (!processedPages[i] || reprocessButton.checked) {
                         processingQueue.push(i + 1);
                     }
                 }
+
+                // 如果processingQueue为空，说明没有页面需要处理,alert
+                if (processingQueue.length === 0) {
+                    alert('所选范围内没有页面需要处理');
+                    return;
+                }
+
+                // 先更新进度条
+                queueProcessedCount = 0;
+                queueTotalCount = processingQueue.length;
+                updateProgress();
                 
                 // 开始处理队列
                 processQueue();
@@ -822,6 +875,7 @@
                     
                     // 更新UI
                     updatePageStatus(pageNum, 'processed');
+                    queueProcessedCount++;
                     updateProgress();
                     updateExportInfo();
                     
@@ -941,12 +995,12 @@
             
             // 更新进度
             function updateProgress() {
-                const processedCount = processedPages.filter(text => text).length;
-                const totalCount = pdfDoc.numPages;
-                const percentage = Math.round((processedCount / totalCount) * 100);
+                // const processedCount = processedPages.filter(text => text).length;
+                // const totalCount = pdfDoc.numPages;
+                const percentage = Math.round((queueProcessedCount / queueTotalCount) * 100);
                 
                 progressBar.style.width = `${percentage}%`;
-                progressText.textContent = `处理进度: ${processedCount}/${totalCount} 页 (${percentage}%)`;
+                progressText.textContent = `处理进度: ${queueProcessedCount}/${queueTotalCount} 页 (${percentage}%)`;
             }
             
             // 复制当前页
