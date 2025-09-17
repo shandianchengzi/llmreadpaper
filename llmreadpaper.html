@@ -358,10 +358,10 @@
         </header>
         
         <div class="upload-section">
-            <h3>上传PDF文件</h3>
+            <h3>上传PDF或TXT文件</h3>
             <div class="drop-area" id="dropArea">
-                <p>拖放PDF文件到这里，或<strong>点击选择文件</strong></p>
-                <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                <p>拖放PDF或TXT文件到这里，或<strong>点击选择文件</strong></p>
+                <input type="file" id="fileInput" accept=".pdf,.txt" style="display: none;">
             </div>
         </div>
         
@@ -584,27 +584,36 @@
             }
             
             // 处理PDF文件
+            // 修改handlePDFFile函数
             async function handlePDFFile(file) {
-                if (file.type !== 'application/pdf') {
-                    alert('请上传PDF文件');
+                if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.txt')) {
+                    alert('请上传PDF或TXT文件');
                     return;
                 }
                 
                 loading.style.display = 'block';
-                resetUI();
                 
                 try {
-                    fileName = file.name.replace('.pdf', '');
-                    const arrayBuffer = await file.arrayBuffer();
-                    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    fileName = file.name.replace(/\.[^/.]+$/, "");
+                    
+                    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                        // PDF处理逻辑
+                        resetUI(); // 只有PDF文件需要完全重置
+                        const arrayBuffer = await file.arrayBuffer();
+                        pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        
+                        // 初始化页面状态
+                        pageTexts = new Array(pdfDoc.numPages).fill('');
+                        processedPages = new Array(pdfDoc.numPages).fill('');
+                    } else {
+                        // TXT文件处理 - 保留现有的processedPages数据
+                        const text = await file.text();
+                        pdfDoc = await createMockPDFDoc(text);
+                    }
                     
                     totalPages.textContent = pdfDoc.numPages;
                     totalCount.textContent = pdfDoc.numPages;
                     currentPage.max = pdfDoc.numPages;
-                    
-                    // 初始化页面状态
-                    pageTexts = new Array(pdfDoc.numPages).fill('');
-                    processedPages = new Array(pdfDoc.numPages).fill('');
                     
                     // 创建页面状态指示器
                     createPageStatusDots(pdfDoc.numPages);
@@ -621,12 +630,54 @@
                     updateExportInfo();
                     
                 } catch (error) {
-                    console.error('处理PDF时出错:', error);
-                    alert('处理PDF时出错: ' + error.message);
+                    console.error('处理文件时出错:', error);
+                    alert('处理文件时出错: ' + error.message);
                 } finally {
                     loading.style.display = 'none';
                 }
             }
+
+            // 添加创建模拟PDF文档的函数
+            // 修改createMockPDFDoc函数，同时导入原文和译文
+            async function createMockPDFDoc(text) {
+                // 解析TXT格式
+                const pages = [];
+                const pageRegex = /=== 第 (\d+) 页 ===\s+【原文】\s+([\s\S]*?)\s+【译文】\s+([\s\S]*?)(?=\s+=== 第 \d+ 页 ===|$)/g;
+                let match;
+                
+                while ((match = pageRegex.exec(text)) !== null) {
+                    const pageNum = parseInt(match[1]);
+                    const originalText = match[2].trim();
+                    const processedText = match[3].trim();
+                    
+                    pages[pageNum - 1] = { originalText, processedText };
+                }
+                
+                // 创建模拟的pdfDoc对象
+                const mockDoc = {
+                    numPages: pages.length,
+                    getPage: async (pageNum) => {
+                        return {
+                            getTextContent: async () => {
+                                const page = pages[pageNum - 1];
+                                return {
+                                    items: page ? page.originalText.split(' ').map(str => ({ str })) : []
+                                };
+                            }
+                        };
+                    }
+                };
+                
+                // 同时将译文导入到processedPages中
+                for (let i = 0; i < pages.length; i++) {
+                    if (pages[i] && pages[i].processedText) {
+                        processedPages[i] = pages[i].processedText;
+                    }
+                }
+                
+                return mockDoc;
+            }
+
             
             // 创建页面状态指示器
             function createPageStatusDots(totalPages) {
@@ -660,7 +711,7 @@
                 totalCount.textContent = pdfDoc.numPages;
             }
             
-            // 加载页面
+            // 修改loadPage函数
             async function loadPage(pageNum) {
                 if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
                 
@@ -1067,7 +1118,7 @@ ${text}`.trim();
                 copyPageButton.disabled = true;
                 progressContainer.style.display = 'none';
                 pageStatus.innerHTML = '';
-                fileName = '';
+                // fileName = '';
             }
         });
     </script>
