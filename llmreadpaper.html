@@ -232,7 +232,7 @@
         .original-text, .processed-text {
             line-height: 1.8;
             white-space: pre-wrap;
-            font-family: 'Courier New', monospace;
+            font-family: Consolas, "Times New Roman", 霞鹜文楷等宽, 微软雅黑,monospace;
             font-size: 14px;
         }
         
@@ -393,13 +393,11 @@
             
             <div>
                 <!-- 添加页码范围输入框 -->
-                <span style="margin-left: 20px;">起始页: </span>
                 <input type="number" id="startPageInput" class="page-input" value="1" min="1" style="width: 60px;">
-                <span>终止页: </span>
+                <span>到</span>
                 <input type="number" id="endPageInput" class="page-input" value="0" min="1" style="width: 60px;">
                 <button class="button" id="startButton" disabled>开始处理</button>
                 <button class="button stop" id="stopButton" disabled>停止处理</button>
-                <button class="button export" id="exportButton">导出文本</button>
             </div>
         </div>
         
@@ -497,7 +495,6 @@
             const reprocessButton = document.getElementById('reprocessButton');
             const startButton = document.getElementById('startButton');
             const stopButton = document.getElementById('stopButton');
-            const exportButton = document.getElementById('exportButton');
             const exportOriginalBtn = document.getElementById('exportOriginalBtn');
             const exportProcessedBtn = document.getElementById('exportProcessedBtn');
             const exportCombinedBtn = document.getElementById('exportCombinedBtn');
@@ -533,7 +530,6 @@
             let queueTotalCount = 0;
             
             // 初始化导出按钮状态
-            exportButton.disabled = true;
             exportOriginalBtn.disabled = true;
             exportProcessedBtn.disabled = true;
             exportCombinedBtn.disabled = true;
@@ -552,7 +548,6 @@
             fileInput.addEventListener('change', handleFileSelect);
             startButton.addEventListener('click', startProcessing);
             stopButton.addEventListener('click', stopProcessing);
-            exportButton.addEventListener('click', () => exportOptions.style.display = exportOptions.style.display === 'none' ? 'block' : 'none');
             exportOriginalBtn.addEventListener('click', exportOriginalText);
             exportProcessedBtn.addEventListener('click', exportProcessedText);
             exportCombinedBtn.addEventListener('click', exportCombinedText);
@@ -650,7 +645,6 @@
                     await loadPage(1);
                     
                     startButton.disabled = false;
-                    exportButton.disabled = false;
                     exportOriginalBtn.disabled = false;
                     exportProcessedBtn.disabled = false;
                     exportCombinedBtn.disabled = false;
@@ -1162,7 +1156,6 @@ ${text}`.trim();
                 processedText.textContent = '';
                 startButton.disabled = true;
                 stopButton.disabled = true;
-                exportButton.disabled = true;
                 exportOriginalBtn.disabled = true;
                 exportProcessedBtn.disabled = true;
                 exportCombinedBtn.disabled = true;
