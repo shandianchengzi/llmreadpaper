@@ -2,6 +2,9 @@
 
 # generate_dockerfile.sh - 生成动态端口的Dockerfile
 
+# 加载环境变量文件
+source .env
+
 # 加载环境变量
 if [ -f .env ]; then
     export $(cat .env | grep -v '#' | awk '/=/ {print $1}')

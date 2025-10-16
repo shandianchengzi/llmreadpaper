@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 环境准备
-mv .env.example .env
+cp .env.example .env
 
 # 安装依赖
 pip install -r requirements.txt
